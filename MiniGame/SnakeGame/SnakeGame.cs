@@ -11,13 +11,21 @@
         // 뱀이 길어질 것이므로, 배열로 바꾼다
         static int[] x = new int[100], y = new int[100];  // x, y 좌표값을 저장 총 100개
 
+        static int food_x, food_y;	//food의 좌표값을 저장 
+
+        static int score;          //점수 저장: reset함수에 의해 초기화됨
+        static int best_score = 0; //최고 점수 저장: reset함수에 의해 초기화 되지 않음 
+        static int last_score = 0; //마지막 점수 저장: reset함수에 의해 초기화 되지 않음
+
+
         static int dir;  // 이동방향 저장
         static int key;  // 입력받은 키 저장
         static int speed = 200;
-        static int length = 5;  // 길이(일단 5 고정)
+        static int length;  // 길이
 
         const string sign_Head = "Ｏ";
         const string sign_Body = "ㅇ";
+        const string sign_Food = "☆";   // 먹이
 
         static void Title()
         {
@@ -80,23 +88,103 @@
             }
         }
 
+        // 랜덤위치에 음식 추가
+        static void Food()
+        {
+            bool food_crush_on = false; // food가 뱀 몸통 좌표에 생길 경우 true
+            PrintTo(MAP_X, MAP_Y + MAP_YSIZE, " ");		//점수표시 
+            Console.WriteLine($"  Score : {score}  Last Score : {last_score}  Best Score : {best_score}");
+
+            Random rand = new Random();
+
+            while (true)
+            {
+                food_crush_on = false;
+                food_x = rand.Next(1, MAP_XSIZE - 1); // 난수를 좌표값에 넣음
+                food_y = rand.Next(1, MAP_YSIZE - 1);
+
+                for (int i = 0; i < length; i++) // food가 뱀 몸통과 겹치는지 확인
+                {
+                    if (food_x == x[i] && food_y == y[i])
+                    {
+                        food_crush_on = true; // 겹치면 food_crush_on을 true로 설정
+                        break;
+                    }
+                }
+
+                if (food_crush_on)
+                {
+                    continue; // 겹쳤을 경우 while문을 다시 시작
+                }
+
+                PrintTo(MAP_X + food_x, MAP_Y + food_y, sign_Food); // 안 겹쳤을 경우 좌표값에 food를 찍고
+                speed = Math.Max(50, speed - 3); // 속도 증가 (최소 50 이하로 내려가지 않도록)
+                break;
+            }
+        }
+
+
         // 이동
         static void Move(int dir)
         {
-            int i;
-
+            // 먹이
+            if (x[0] == food_x && y[0] == food_y)
+            {
+                score += 10;
+                Food();
+                length++;
+                x[length - 1] = x[length - 2];
+                y[length - 1] = y[length - 2];
+            }
+            // 벽과 충돌
+            if (x[0] == 0 || x[0] == MAP_XSIZE - 1 || y[0] == 0 || y[0] == MAP_YSIZE - 1)
+            {
+                GameOver();
+                return;
+            }
+            // 몸통과 충돌
+            for (int i = 1; i < length; i++)
+            {
+                if (x[0] == x[i] && y[0] == y[i])
+                {
+                    GameOver();
+                    return;
+                }
+            }
+            // 충돌하지 않았다면 
+            // 몸통부터 1칸씩 옮긴다
             PrintTo(MAP_X + x[length - 1], MAP_Y + y[length - 1], "  "); // 몸통 마지막을 지움
-            for (i = length - 1; i > 0; i--) // 몸통 좌표를 한칸씩 옮김
+            for (int i = length - 1; i > 0; i--) /// 몸통 좌표를 한칸씩 옮김
             {
                 x[i] = x[i - 1];
                 y[i] = y[i - 1];
             }
-            PrintTo(MAP_X + x[0], MAP_Y + y[0], sign_Body); // 머리가 있던 곳을 몸통으로 고침
+            PrintTo(MAP_X + x[0], MAP_Y + y[0], sign_Body); /// 머리가 있던 곳을 몸통으로 고침
+            // 머리를 1칸 옮긴다
+            /// 기본 방향은 왼쪽으로 설정되어있다
             if (dir == (int)ConsoleKey.LeftArrow) --x[0]; // 방향에 따라 새로운 머리좌표(x[0], y[0])값을 변경
             if (dir == (int)ConsoleKey.RightArrow) ++x[0];
             if (dir == (int)ConsoleKey.UpArrow) --y[0];
             if (dir == (int)ConsoleKey.DownArrow) ++y[0];
-            PrintTo(MAP_X + x[i], MAP_Y + y[i], sign_Head); // 새로운 머리좌표값에 머리를 그림
+            PrintTo(MAP_X + x[0], MAP_Y + y[0], sign_Head); // 새로운 머리좌표값에 머리를 그림
+        }
+
+        static void GameOver()
+        {
+            PrintTo(MAP_X + (MAP_XSIZE / 2) - 6, MAP_Y + 5, "+----------------------+");
+            PrintTo(MAP_X + (MAP_XSIZE / 2) - 6, MAP_Y + 6, "       GAME OVER        ");
+            PrintTo(MAP_X + (MAP_XSIZE / 2) - 6, MAP_Y + 7, "+----------------------+");
+            PrintTo(MAP_X + (MAP_XSIZE / 2) - 6, MAP_Y + 8, $" YOUR SCORE : {score}");
+
+            if (score > best_score)
+            {
+                best_score = score;
+                PrintTo(MAP_X + (MAP_XSIZE / 2) - 4, MAP_Y + 10, " BEST SCORE ");
+            }
+
+            Thread.Sleep(500);
+            Console.ReadKey(true);
+            Title();
         }
 
         // 초기화
@@ -107,8 +195,10 @@
             DrawMap();
 
             while (Console.KeyAvailable) Console.ReadKey(true); // 버퍼에 있는 키값을 버림
-            dir = (int)ConsoleKey.LeftArrow; // 방향 초기화
-            speed = 200; // 속도 초기화
+            dir = (int)ConsoleKey.LeftArrow; /// 방향 초기화(기본값: 왼쪽방향)
+            speed = 200;    // 속도 초기화 
+            length = 5;     // 뱀 길이 초기화 
+            score = 0;		// 점수 초기화 
 
             for (int i = 0; i < length; i++)
             {
@@ -117,9 +207,32 @@
                 PrintTo(x[i], y[i], sign_Body); // 뱀 몸통값 입력
             }
             PrintTo(x[0], y[0], sign_Head); // 뱀 머리 그림
+            Food();
         }
 
-
+        static void Pause()
+        {
+            while (true)
+            {
+                if (key == (int)ConsoleKey.P)
+                {
+                    PrintTo(MAP_X + (MAP_XSIZE / 2) - 9, MAP_Y, "< PAUSE : PRESS ANY KEY TO RESUME > ");
+                    Thread.Sleep(400);
+                    PrintTo(MAP_X + (MAP_XSIZE / 2) - 9, MAP_Y, "                                    ");
+                    Thread.Sleep(400);
+                }
+                else
+                {
+                    // 아무 키나 누르면 다시 게임이 재개된다
+                    DrawMap();
+                    return;
+                }
+                if (Console.KeyAvailable)
+                {
+                    key = (int)Console.ReadKey(true).Key;
+                }
+            }
+        }
 
         static void Main(string[] args)
         {
@@ -151,6 +264,9 @@
                         break;
                     case (int)ConsoleKey.Escape:
                         Environment.Exit(0);
+                        break;
+                    case (int)ConsoleKey.P:  // 'P' 키를 눌렀을 때 (일시정지)
+                        Pause();
                         break;
                 }
                 key = 0;    // 입력된 키 값을 초기화
